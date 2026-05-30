@@ -1,0 +1,25 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# Found-match output (may contain private keys — NEVER commit)
+found.txt
+
+# Large address datasets (download separately — exceed GitHub's 100 MB limit)
+*.txt.gz
+*.csv
+Latest_Rich_Bitcoin_*.txt
+blockchair_*.tsv*
+
+# Local scratch helpers — NOT published (contain a real BIP39 mnemonic)
+/scratch/
+
+# Local scratch output / secrets
+*.secret
+wallet*.json
+
+# Editor / OS
+.DS_Store
+.idea/
+*.swp

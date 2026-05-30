@@ -1,0 +1,30 @@
+[package]
+name = "btc-key-research"
+version = "0.1.0"
+edition = "2021"
+description = "Educational Bitcoin key-space scanner: benchmarks secp256k1 key derivation and demonstrates the infeasibility of brute-forcing funded addresses."
+license = "MIT"
+repository = "https://github.com/ganifaev2303-maker/btc-key-research"
+keywords = ["bitcoin", "secp256k1", "cryptography", "education", "benchmark"]
+categories = ["cryptography::cryptocurrencies", "command-line-utilities"]
+
+[dependencies]
+secp256k1 = { version = "0.29", features = ["rand-std"] }
+sha2 = "0.10"
+ripemd = "0.1"
+bs58 = "0.5"
+rand = "0.8"
+rayon = "1.10"
+num_cpus = "1.16"
+hex = "0.4"
+flate2 = "1.1.9"
+walkdir = "2.5.0"
+bech32 = "=0.9.1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+# Note: `target-cpu = "native"` is set via .cargo/config.toml (RUSTFLAGS),
+# not here — it is not a valid [profile] key and Cargo silently ignores it.
+panic = "abort"

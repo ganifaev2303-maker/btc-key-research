@@ -1,0 +1,6 @@
+# Build the hottest crypto loop for the CPU of the machine doing the build.
+# This makes the resulting binary NON-portable (it may use AVX2/SHA-NI/etc.
+# instructions absent on other CPUs). Comment this out if you build on one
+# machine and run on another.
+[build]
+rustflags = ["-C", "target-cpu=native"]
