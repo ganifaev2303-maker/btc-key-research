@@ -19,7 +19,9 @@ blockchair_*.tsv*
 *.secret
 wallet*.json
 
-# Editor / OS
+# Editor / OS / tooling
 .DS_Store
 .idea/
+.vscode/
+.claude/
 *.swp

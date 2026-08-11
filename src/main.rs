@@ -12,19 +12,19 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use walkdir::WalkDir;
 
-/// Хранилище распарсенных Hash160 (бинарных payload'ов)
+/// Parsed target Hash160 payloads (binary form)
 #[derive(Default)]
 struct TargetHashes {
-    // Хранит 20-байтный Hash160(PubKey). Подходит для P2PKH (1...) и P2WPKH (bc1q...)
+    // 20-byte Hash160(pubkey) — serves P2PKH (1...) and P2WPKH (bc1q...)
     p2pkh_wpkh: HashSet<[u8; 20]>,
-    // Хранит 20-байтный Hash160(RedeemScript). Подходит для P2SH (3...)
+    // 20-byte Hash160(redeemScript) — serves P2SH (3...)
     p2sh: HashSet<[u8; 20]>,
 }
 
 impl TargetHashes {
-    /// Парсит любую строку адреса и извлекает из неё Hash160 Payload
+    /// Parses an address string and stores its Hash160 payload
     fn parse_and_insert(&mut self, addr: &str) -> bool {
-        // 1. Проверяем Base58Check (P2PKH или P2SH)
+        // 1. Try Base58Check (P2PKH or P2SH)
         if let Ok(decoded) = bs58::decode(addr).into_vec() {
             if decoded.len() == 25 {
                 let mut hash = [0u8; 20];
@@ -42,17 +42,17 @@ impl TargetHashes {
             }
         }
 
-        // 2. Проверяем Bech32 (P2WPKH)
-        #[allow(deprecated)] // Для совместимости с разными версиями bech32
+        // 2. Try Bech32 (P2WPKH)
+        #[allow(deprecated)] // kept for compatibility across bech32 versions
         if let Ok((hrp, data, _variant)) = bech32::decode(addr) {
             if hrp == "bc" && !data.is_empty() {
-                // Первый байт в data — версия SegWit. Нам нужен v0
+                // First byte of data is the SegWit witness version; we want v0
                 if data[0].to_u8() == 0 {
                     if let Ok(payload) = Vec::<u8>::from_base32(&data[1..]) {
                         if payload.len() == 20 {
                             let mut hash = [0u8; 20];
                             hash.copy_from_slice(&payload);
-                            // Хэш публичного ключа P2WPKH такой же, как у P2PKH
+                            // P2WPKH uses the same pubkey hash as P2PKH
                             self.p2pkh_wpkh.insert(hash);
                             return true;
                         }
@@ -65,7 +65,7 @@ impl TargetHashes {
     }
 }
 
-/// Вычисляет Hash160 (SHA256 -> RIPEMD160)
+/// Computes Hash160 (SHA-256 -> RIPEMD-160)
 #[inline]
 fn hash160(data: &[u8]) -> [u8; 20] {
     let sha256_hash = Sha256::digest(data);
@@ -75,7 +75,7 @@ fn hash160(data: &[u8]) -> [u8; 20] {
     result
 }
 
-/// Вычисляет Hash160 для P2SH-P2WPKH (Nested Segwit)
+/// Computes the Hash160 for P2SH-P2WPKH (nested SegWit)
 #[inline]
 fn p2sh_wpkh_hash(pubkey_hash160: &[u8; 20]) -> [u8; 20] {
     let mut script = Vec::with_capacity(22);
@@ -85,7 +85,7 @@ fn p2sh_wpkh_hash(pubkey_hash160: &[u8; 20]) -> [u8; 20] {
     hash160(&script)
 }
 
-/// Конвертирует Hash160 в строку адреса P2PKH (для логгирования)
+/// Converts a Hash160 into a P2PKH address string (for logging)
 fn hash160_to_p2pkh(hash: &[u8; 20]) -> String {
     let mut payload = Vec::with_capacity(25);
     payload.push(0x00);
@@ -95,13 +95,13 @@ fn hash160_to_p2pkh(hash: &[u8; 20]) -> String {
     bs58::encode(payload).into_string()
 }
 
-/// Читает адреса из файла или директории
+/// Loads target addresses from files under the given path
 fn load_target_hashes(path: &str) -> TargetHashes {
     let mut targets = TargetHashes::default();
     let mut valid_count = 0;
     let mut skipped_count = 0;
 
-    println!("📂 Сканирование пути: {}", path);
+    println!("📂 Scanning path: {}", path);
 
     for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
         let file_path = entry.path();
@@ -110,10 +110,10 @@ fn load_target_hashes(path: &str) -> TargetHashes {
             let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
             if ext == "txt" || ext == "gz" || ext == "csv" || fname == "addresses.txt" {
-                println!("   ⚙️ Читаем: {}", file_path.display());
+                println!("   ⚙️ Reading: {}", file_path.display());
                 let file = fs::File::open(file_path).unwrap();
 
-                // Обработка обычных и .gz файлов
+                // Handle plain and gzipped files
                 let reader: Box<dyn BufRead> = if ext == "gz" {
                     Box::new(BufReader::new(GzDecoder::new(file)))
                 } else {
@@ -136,16 +136,16 @@ fn load_target_hashes(path: &str) -> TargetHashes {
         }
     }
 
-    println!("✅ Парсинг завершен.");
-    println!("📋 Найдено адресов всего: {}", valid_count + skipped_count);
-    println!("📋 Из них успешно загружено: {}", valid_count);
+    println!("✅ Parsing complete.");
+    println!("📋 Total addresses found: {}", valid_count + skipped_count);
+    println!("📋 Successfully loaded: {}", valid_count);
     println!(
-        "   - Уникальных Payload (P2PKH/P2WPKH): {}",
+        "   - Unique payloads (P2PKH/P2WPKH): {}",
         targets.p2pkh_wpkh.len()
     );
-    println!("   - Уникальных Payload (P2SH): {}", targets.p2sh.len());
+    println!("   - Unique payloads (P2SH): {}", targets.p2sh.len());
     if skipped_count > 0 {
-        println!("⚠️ Пропущено (неизвестный формат): {}", skipped_count);
+        println!("⚠️ Skipped (unknown format): {}", skipped_count);
     }
     println!();
 
@@ -157,10 +157,10 @@ fn save_found(privkey: &SecretKey, hash: &[u8; 20], key_type: &str, found_type: 
         .create(true)
         .append(true)
         .open("found.txt")
-        .expect("Не удалось открыть found.txt");
+        .expect("Failed to open found.txt");
 
     let privkey_hex = hex::encode(privkey.secret_bytes());
-    // Генерируем классический адрес для отображения
+    // Derive the legacy address for display
     let p2pkh_addr = hash160_to_p2pkh(hash);
 
     let line = format!(
@@ -169,14 +169,14 @@ fn save_found(privkey: &SecretKey, hash: &[u8; 20], key_type: &str, found_type: 
     );
 
     file.write_all(line.as_bytes())
-        .expect("Не удалось записать");
-    println!("\n🎉 НАЙДЕНО СОВПАДЕНИЕ! {:?}", line.trim());
+        .expect("Failed to write to found.txt");
+    println!("\n🎉 MATCH FOUND! {:?}", line.trim());
 }
 
 fn print_banner() {
     println!("╔══════════════════════════════════════════════════════╗");
-    println!("║      BTC Private Key Research Tool (Rust)           ║");
-    println!("║      P2PKH + P2SH + Native Segwit (Directory Scan)  ║");
+    println!("║      BTC Private Key Research Tool (Rust)            ║");
+    println!("║      P2PKH + P2SH + Native SegWit (Directory Scan)   ║");
     println!("╚══════════════════════════════════════════════════════╝");
     println!();
 }
@@ -184,18 +184,18 @@ fn print_banner() {
 fn main() {
     print_banner();
 
-    // Загружаем директорию (текущую или '.' где лежат адреса)
+    // Load targets from the current directory
     let targets = load_target_hashes(".");
 
     if targets.p2pkh_wpkh.is_empty() && targets.p2sh.is_empty() {
-        eprintln!("❌ В директории не найдено валидных Bitcoin адресов для сканирования.");
+        eprintln!("❌ No valid Bitcoin addresses found in the directory.");
         std::process::exit(1);
     }
 
     let num_threads = num_cpus::get();
-    println!("🖥️  Потоков CPU: {}", num_threads);
-    println!("🔑 Проверяем: {{P2PKH, P2WPKH}} - Compressed/Uncompressed, P2SH-P2WPKH - Compressed");
-    println!("🚀 Начинаем генерацию...");
+    println!("🖥️  CPU threads: {}", num_threads);
+    println!("🔑 Checking: {{P2PKH, P2WPKH}} - compressed/uncompressed, P2SH-P2WPKH - compressed");
+    println!("🚀 Starting generation...");
     println!();
 
     rayon::ThreadPoolBuilder::new()
@@ -223,14 +223,13 @@ fn main() {
                 let pub_c = public_key.serialize();
                 let h160_c = hash160(&pub_c);
 
-                // Check P2PKH / P2WPKH Compressed
+                // Check P2PKH / P2WPKH compressed
                 if p2pkh_arc.contains(&h160_c) {
                     let _lock = log_mutex.lock().unwrap();
                     save_found(&secret_key, &h160_c, "compressed", "P2PKH/P2WPKH");
                 }
 
-                // Check P2SH Compressed
-                // P2SH checks only make sense for compressed keys mostly, but we do it anyway.
+                // Check P2SH-P2WPKH (defined for compressed keys only)
                 if !p2sh_arc.is_empty() {
                     let p2sh_hash = p2sh_wpkh_hash(&h160_c);
                     if p2sh_arc.contains(&p2sh_hash) {
@@ -257,7 +256,7 @@ fn main() {
         let speed = total as f64 / elapsed;
 
         print!(
-            "\r⚡ Проверено: {:>12} ключей | Скорость: {:>10.0} keys/sec | Время: {:.1}s   ",
+            "\r⚡ Checked: {:>12} keys | Speed: {:>10.0} keys/sec | Time: {:.1}s   ",
             format_number(total),
             speed,
             elapsed

@@ -108,7 +108,7 @@ the well-known published vectors:
 | Native P2WPKH | `bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4` |
 
 If any of the first two mismatch, the crypto pipeline is broken; the test prints
-`ОШИБКА ❌`.
+`❌ MISMATCH`.
 
 ## Performance notes
 
